@@ -1,0 +1,25 @@
+# EvoLink v0.6 no Railway: extrai os arquivos do ZIP presente no GitHub.
+# Nao usa apk add nem exige a pasta public solta no repositorio.
+FROM node:22-alpine
+WORKDIR /app
+
+COPY . /tmp/evolink-repo/
+
+RUN set -eu; \
+    archive='/tmp/evolink-repo/EvoLink-Pokemon-Evolution-RPG-v0.6-Online.zip'; \
+    test -f "$archive" || { echo 'ZIP v0.6 nao encontrado na raiz do repositorio.' >&2; exit 1; }; \
+    mkdir -p /tmp/evolink-unpacked; \
+    busybox unzip -q "$archive" -d /tmp/evolink-unpacked; \
+    cp -R /tmp/evolink-unpacked/evolink-pokemon-rpg/. /app/; \
+    test -f /app/server.js; \
+    test -f /app/public/index.html; \
+    mkdir -p /app/data; \
+    chown -R node:node /app; \
+    rm -rf /tmp/evolink-repo /tmp/evolink-unpacked
+
+ENV NODE_ENV=production PORT=3000 DATA_DIR=/app/data TRUST_PROXY=1
+EXPOSE 3000
+
+# Antes, so o require('/app/server.js') era chamado: o servidor nao escutava conexoes.
+# Agora inicia explicitamente o HTTP server em 0.0.0.0 e na porta configurada.
+CMD ["node", "-e", "const fs=require('node:fs');const dir=process.env.DATA_DIR||'/app/data';fs.mkdirSync(dir,{recursive:true});fs.chownSync(dir,1000,1000);process.setgid(1000);process.setuid(1000);const port=Number(process.env.PORT||3000);require('/app/server.js').createServer().listen(port,'0.0.0.0',()=>console.log('EvoLink pronto na porta '+port));"]
