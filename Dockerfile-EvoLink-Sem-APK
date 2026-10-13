@@ -1,0 +1,24 @@
+# EvoLink v0.6 — Railway com ZIP na raiz do GitHub.
+# Sem apk add: usa o unzip incluido no BusyBox do Alpine.
+FROM node:22-alpine
+WORKDIR /app
+
+COPY . /tmp/evolink-repo/
+
+RUN set -eu; \
+    archive='/tmp/evolink-repo/EvoLink-Pokemon-Evolution-RPG-v0.6-Online.zip'; \
+    test -f "$archive" || { echo 'ERRO: ZIP v0.6 nao encontrado na raiz do repositorio.' >&2; exit 1; }; \
+    mkdir -p /tmp/evolink-unpacked; \
+    busybox unzip -q "$archive" -d /tmp/evolink-unpacked; \
+    cp -R /tmp/evolink-unpacked/evolink-pokemon-rpg/. /app/; \
+    test -f /app/server.js; \
+    test -f /app/public/index.html; \
+    mkdir -p /app/data; \
+    chown -R node:node /app; \
+    rm -rf /tmp/evolink-repo /tmp/evolink-unpacked
+
+ENV NODE_ENV=production PORT=3000 DATA_DIR=/app/data TRUST_PROXY=1
+EXPOSE 3000
+
+# Ajusta o proprietario do volume Railway e reduz privilegios antes de iniciar.
+CMD ["node", "-e", "const fs=require('node:fs'); const data=process.env.DATA_DIR||'/app/data'; fs.mkdirSync(data,{recursive:true}); fs.chownSync(data,1000,1000); process.setgid(1000); process.setuid(1000); require('/app/server.js');"]
