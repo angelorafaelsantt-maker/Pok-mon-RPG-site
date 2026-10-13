@@ -1,0 +1,132 @@
+{
+  "species": [
+    {
+      "number": 1,
+      "name": "Cedarbi",
+      "category": "",
+      "inspirationCountry": "Marrocos",
+      "type1": "Grama",
+      "type2": "",
+      "heightM": null,
+      "weightKg": null,
+      "description": "",
+      "abilities": {
+        "primary": "",
+        "secondary": "",
+        "hidden": ""
+      },
+      "stats": {
+        "hp": null,
+        "attack": null,
+        "defense": null,
+        "spAttack": null,
+        "spDefense": null,
+        "speed": null
+      },
+      "evolvesFrom": null,
+      "evolvesTo": 2,
+      "evolutionMethod": "",
+      "images": {
+        "normal": "",
+        "shiny": ""
+      },
+      "visibleToPlayers": true
+    },
+    {
+      "number": 2,
+      "name": "Zellion",
+      "category": "",
+      "inspirationCountry": "Marrocos",
+      "type1": "Grama",
+      "type2": "Psíquico",
+      "heightM": null,
+      "weightKg": null,
+      "description": "",
+      "abilities": {
+        "primary": "",
+        "secondary": "",
+        "hidden": ""
+      },
+      "stats": {
+        "hp": null,
+        "attack": null,
+        "defense": null,
+        "spAttack": null,
+        "spDefense": null,
+        "speed": null
+      },
+      "evolvesFrom": 1,
+      "evolvesTo": 3,
+      "evolutionMethod": "",
+      "images": {
+        "normal": "",
+        "shiny": ""
+      },
+      "visibleToPlayers": true
+    },
+    {
+      "number": 3,
+      "name": "Mosaileo",
+      "category": "",
+      "inspirationCountry": "Marrocos",
+      "type1": "Grama",
+      "type2": "Psíquico",
+      "heightM": null,
+      "weightKg": null,
+      "description": "",
+      "abilities": {
+        "primary": "",
+        "secondary": "",
+        "hidden": ""
+      },
+      "stats": {
+        "hp": null,
+        "attack": null,
+        "defense": null,
+        "spAttack": null,
+        "spDefense": null,
+        "speed": null
+      },
+      "evolvesFrom": 2,
+      "evolvesTo": null,
+      "evolutionMethod": "",
+      "images": {
+        "normal": "",
+        "shiny": ""
+      },
+      "visibleToPlayers": true
+    },
+    {
+      "number": 10,
+      "name": "Gasenik",
+      "category": "",
+      "inspirationCountry": "Macedônia",
+      "type1": "Inseto",
+      "type2": "Pedra",
+      "heightM": null,
+      "weightKg": null,
+      "description": "",
+      "abilities": {
+        "primary": "",
+        "secondary": "",
+        "hidden": ""
+      },
+      "stats": {
+        "hp": null,
+        "attack": null,
+        "defense": null,
+        "spAttack": null,
+        "spDefense": null,
+        "speed": null
+      },
+      "evolvesFrom": null,
+      "evolvesTo": 11,
+      "evolutionMethod": "",
+      "images": {
+        "normal": "",
+        "shiny": ""
+      },
+      "visibleToPlayers": true
+    }
+  ]
+}

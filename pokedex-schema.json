@@ -1,0 +1,244 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Pokédex Evolution — Importação de espécies v0.2",
+  "type": "object",
+  "required": [
+    "species"
+  ],
+  "properties": {
+    "species": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 200,
+      "items": {
+        "type": "object",
+        "required": [
+          "number",
+          "name",
+          "type1"
+        ],
+        "properties": {
+          "number": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9999
+          },
+          "name": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 45
+          },
+          "category": {
+            "type": "string"
+          },
+          "inspirationCountry": {
+            "type": "string"
+          },
+          "type1": {
+            "enum": [
+              "Normal",
+              "Fogo",
+              "Água",
+              "Grama",
+              "Elétrico",
+              "Gelo",
+              "Lutador",
+              "Veneno",
+              "Terra",
+              "Voador",
+              "Psíquico",
+              "Inseto",
+              "Pedra",
+              "Fantasma",
+              "Dragão",
+              "Sombrio",
+              "Aço",
+              "Fada"
+            ]
+          },
+          "type2": {
+            "enum": [
+              "",
+              "Normal",
+              "Fogo",
+              "Água",
+              "Grama",
+              "Elétrico",
+              "Gelo",
+              "Lutador",
+              "Veneno",
+              "Terra",
+              "Voador",
+              "Psíquico",
+              "Inseto",
+              "Pedra",
+              "Fantasma",
+              "Dragão",
+              "Sombrio",
+              "Aço",
+              "Fada"
+            ]
+          },
+          "heightM": {
+            "oneOf": [
+              {
+                "type": "number",
+                "minimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "weightKg": {
+            "oneOf": [
+              {
+                "type": "number",
+                "minimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 750
+          },
+          "abilities": {
+            "type": "object",
+            "properties": {
+              "primary": {
+                "type": "string"
+              },
+              "secondary": {
+                "type": "string"
+              },
+              "hidden": {
+                "type": "string"
+              }
+            }
+          },
+          "stats": {
+            "type": "object",
+            "properties": {
+              "hp": {
+                "oneOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 255
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "attack": {
+                "oneOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 255
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "defense": {
+                "oneOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 255
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "spAttack": {
+                "oneOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 255
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "spDefense": {
+                "oneOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 255
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "speed": {
+                "oneOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 255
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          },
+          "evolvesFrom": {
+            "oneOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9999
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "evolvesTo": {
+            "oneOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9999
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "evolutionMethod": {
+            "type": "string"
+          },
+          "images": {
+            "type": "object",
+            "properties": {
+              "normal": {
+                "type": "string"
+              },
+              "shiny": {
+                "type": "string"
+              }
+            }
+          },
+          "visibleToPlayers": {
+            "type": "boolean"
+          }
+        }
+      }
+    }
+  }
+}
