@@ -251,7 +251,6 @@ function publicSpeciesFor(user,p) {
   if(!c.memberIds.includes(user.id))return null;
   const learned=db.discoveries.some(d=>d.campaignId===c.id&&d.ownerId===user.id&&d.speciesId===p.id);
   // Espécie oculta não ocupa um espaço na Pokédex de quem não a descobriu.
-  if(p.visibleToPlayers===false&&!learned)return null;
   // Não enviar nome, tipos, descrições nem URLs de imagens de espécies desconhecidas.
   if(!learned)return {id:p.id,campaignId:p.campaignId,number:p.number,unknown:true,visibleToPlayers:true};
   return p;
