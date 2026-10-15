@@ -10,6 +10,7 @@ RUN set -eu; \
     mkdir -p /tmp/evolink-extracted; \
     busybox unzip -q "$archive" -d /tmp/evolink-extracted; \
     cp -R /tmp/evolink-extracted/evolink-pokemon-rpg/. /app/; \
+    cp /tmp/evolink-repo/server.js /app/server.js; \
     test -s /app/public/index.html || { echo 'ERRO: arquivo public/index.html ausente do aplicativo.' >&2; exit 1; }; \
     test -s /app/server.js || { echo 'ERRO: arquivo server.js ausente.' >&2; exit 1; }; \
     mkdir -p /app/data; \
