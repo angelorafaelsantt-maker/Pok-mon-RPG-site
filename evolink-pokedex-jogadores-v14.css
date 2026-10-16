@@ -1,0 +1,20 @@
+/* Pokédex visual dos Jogadores v14 */
+.evo-v14-screen{background:#e0f0e9!important;padding-bottom:186px!important}
+.evo-v14-pokedex-list{max-width:720px;margin:0 auto;padding:6px 2px 25px}
+.evo-v14-header{padding:20px 8px 16px!important}
+.evo-v14-progress{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin:8px 0 18px}
+.evo-v14-progress>div{background:#fff;border-radius:14px;padding:12px 4px;display:flex;flex-direction:column;align-items:center;gap:3px;box-shadow:0 2px 8px #33574d15}
+.evo-v14-progress b{color:#456a5d;font-size:22px}.evo-v14-progress small{font-size:10px;color:#678b80;font-weight:700}
+.evo-v14-filters{display:flex;gap:7px;overflow:auto;margin-bottom:14px;padding-bottom:3px}
+.evo-v14-filters button{background:#f7fbf9;border:1px solid #bfd8cb;color:#547a6c;border-radius:999px;padding:9px 12px;font-weight:800;white-space:nowrap;font-size:12px;flex:1}
+.evo-v14-filters button.active{background:#588e79;color:white;border-color:#588e79}
+.evo-v14-tip{font-size:12px;color:#668479;line-height:1.5;margin:16px 4px}
+.evo-v14-chip{padding:4px 8px!important;font-size:10px!important;gap:4px!important;min-height:25px!important}
+.evo-v14-chip b{font-size:12px}
+.evo-v14-locked{filter:grayscale(.8);opacity:.75;cursor:not-allowed!important;box-shadow:none}
+.evo-v14-locked-art{font-size:64px;font-weight:900;line-height:1;color:#9db7ae}
+.evo-v14-readonly .evo-v13-actions .btn{flex:1}
+.evo-v14-readonly .evo-v13-detail-header{top:0}
+.evo-v14-screen .dex-v12-card{flex-shrink:0}
+.evo-v14-screen .dex-v12-header h1{color:#39685b}
+@media(max-width:410px){.evo-v14-progress b{font-size:19px}.evo-v14-progress small{font-size:10px}.evo-v14-filters{gap:4px}.evo-v14-filters button{font-size:11px;padding:9px 8px}}
