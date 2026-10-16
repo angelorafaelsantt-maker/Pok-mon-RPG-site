@@ -59,7 +59,7 @@ function dashboardHome(){
 function campaignCards() {
  return state.campaigns.map(c=>`<article class="list-card"><div class="row"><h3>${esc(c.name)}</h3><span class="badge">${c.members.length} jogador(es)</span></div><p>Organização: ${esc(c.masterName)}</p>
   ${state.user.role==='mestre'?`<div class="row"><span class="code" aria-label="Código da campanha">${esc(c.code)}</span><button type="button" class="btn secondary tiny" data-action="copy-code" data-value="${esc(c.code)}">📋 Copiar código</button></div><div class="row" style="margin-top:10px"><button type="button" class="btn blue tiny" data-action="share-invite" data-value="${esc(c.code)}" data-name="${esc(c.name)}">📨 Compartilhar convite</button><button type="button" class="btn tiny ghost" data-action="recode" data-value="${esc(c.id)}">🔄 Trocar código</button></div>${DEMO?'<div class="demo-online-warning">⚠️ O código desta demonstração funciona somente neste navegador. Para convidar outros celulares, abra a versão hospedada online.</div>':''}`:''}
-  ${state.user.role==='mestre'?`<hr><strong style="font-size:13px">Participantes</strong>${c.members.length?`<div class="members" style="margin-top:9px">${c.members.map(u=>`<div class="member"><span>🧢 ${esc(u.trainer?.name||u.name)}<br><small>@${esc(u.username)}</small></span><button type="button" class="btn tiny ghost" data-action="remove-member" data-id="${esc(c.id)}" data-value="${esc(u.id)}">Remover</button></div>`).join('')}</div>`:'<p>Nenhum jogador entrou ainda. Compartilhe o código acima!</p>'}`:''}
+  ${`<hr><strong style="font-size:13px">Participantes</strong>${c.members.length?`<div class="members" style="margin-top:9px">${c.members.map(u=>`<div class="member">${trainerPortrait(u.trainer)}<span>🧢 ${esc(u.trainer?.name||u.name)}<br><small>@${esc(u.username)}</small></span>${state.user.role==='mestre'?`<button type="button" class="btn tiny ghost" data-action="remove-member" data-id="${esc(c.id)}" data-value="${esc(u.id)}">Remover</button>`:''}</div>`).join('')}</div>`:'<p>Nenhum jogador entrou ainda. Compartilhe o código acima!</p>'}`}
  </article>`).join('');
 }
 function dashboardCampaigns(){const master=state.user.role==='mestre';return `
@@ -117,12 +117,13 @@ function dexBadge(status){
  return '<span class="dex-marker catalog">📖 Catálogo</span>';
 }
 function speciesCards(c){
- const trainer=dexTrainer(c);
  const master=state.user.role==='mestre';
+ const managing=master&&state.dexSection==='manage';
+ const trainer=managing?null:dexTrainer(c);
  const all=state.species.filter(p=>p.campaignId===c.id).sort((a,b)=>a.number-b.number);
  const filtered=all.filter(p=>{
   const st=dexStatus(p,c,trainer);
-  return state.dexFilter==='all'||(state.dexFilter==='seen'&&(st==='seen'||st==='caught'))||st===state.dexFilter;
+  return managing||state.dexFilter==='all'||(state.dexFilter==='seen'&&(st==='seen'||st==='caught'))||st===state.dexFilter;
  });
  return filtered.map(p=>{
   const status=dexStatus(p,c,trainer),undiscovered=(p.unknown===true||(!master&&status==='unknown'));
@@ -148,8 +149,8 @@ function speciesCards(c){
    </details>`}
    ${master?`<div class="dex-card-actions">
     ${trainer?`<button type="button" class="btn tiny ${status==='unknown'?'blue':'secondary'}" data-action="dex-discovery" data-id="${esc(c.id)}" data-trainer="${esc(trainer)}" data-value="${esc(p.id)}" data-status="${status==='unknown'?'seen':'unseen'}">${status==='unknown'?'👁 Marcar visto':'↶ Resetar visto'}</button>`:''}
-    <button type="button" class="btn tiny secondary" data-action="edit-species" data-value="${esc(p.id)}">✏️ Editar</button>
-    <button type="button" class="btn tiny ghost" data-action="delete-species" data-value="${esc(p.id)}" data-id="${esc(c.id)}">Excluir</button>
+    ${managing?`<button type="button" class="btn tiny secondary" data-action="edit-species" data-value="${esc(p.id)}">✏️ Editar</button>
+    <button type="button" class="btn tiny ghost" data-action="delete-species" data-value="${esc(p.id)}" data-id="${esc(c.id)}">Excluir</button>`:''}
    </div>`:''}
   </article>`;
  }).join('')||empty('🔎','Nenhuma espécie encontrada','Altere o filtro para visualizar outros Pokémon.');
@@ -161,17 +162,20 @@ function dashboardPokedex(){
  const catalog=state.species.filter(p=>p.campaignId===c.id);
  const counts={seen:0,caught:0,unknown:0};for(const sp of catalog){const st=dexStatus(sp,c,trainer);if(st==='caught'){counts.caught++;counts.seen++;}else if(st==='seen')counts.seen++;else counts.unknown++;}
  return `${campaignPicker()}<section class="hero-welcome"><span class="badge gold">📘 POKÉDEX EVOLUTION</span><h1>${esc(c.name)}</h1><p>${master?'Acompanhe as descobertas de cada treinador.':'Descubra Pokémon durante sua jornada!'} • ${catalog.length} registros disponíveis</p></section>
- ${master&&c.members.length?`<div class="picker"><label for="dex-trainer-select">Pokédex do treinador</label><select id="dex-trainer-select">${c.members.map(m=>`<option value="${esc(m.id)}" ${trainer===m.id?'selected':''}>${esc(m.trainer?.name||m.name)}</option>`).join('')}</select></div>`:''}
+ ${master?`<div class="dex-filter-bar" role="group" aria-label="Seções da Pokédex">${[['pokemon','Pokémon'],['manage','Fichas e criação']].map(([key,label])=>`<button type="button" class="dex-tab ${(state.dexSection||'pokemon')===key?'active':''}" data-action="dex-section" data-value="${key}" aria-pressed="${(state.dexSection||'pokemon')===key}">${label}</button>`).join('')}</div>`:''}
+ ${!master||state.dexSection!=='manage'?` ${master&&c.members.length?`<div class="picker"><label for="dex-trainer-select">Pokédex do treinador</label><select id="dex-trainer-select">${c.members.map(m=>`<option value="${esc(m.id)}" ${trainer===m.id?'selected':''}>${esc(m.trainer?.name||m.name)}</option>`).join('')}</select></div>`:''}
  ${master&&!c.members.length?'<div class="note">Convide jogadores para registrar encontros e acompanhar seus progressos pessoais.</div>':''}
  <div class="dex-progress" aria-label="Progresso da Pokédex">
   <div><span>👁 Vistos</span><strong>${counts.seen}</strong></div><div><span>◉ Capturados</span><strong>${counts.caught}</strong></div><div><span>🔒 Desconhecidos</span><strong>${counts.unknown}</strong></div>
  </div>
  <div class="dex-filter-bar" role="group" aria-label="Filtrar Pokédex">${[['all','Todos'],['seen','Vistos'],['caught','Capturados'],['unknown','Não vistos']].map(([k,t])=>`<button type="button" class="dex-tab ${state.dexFilter===k?'active':''}" data-action="dex-filter" data-value="${k}" aria-pressed="${state.dexFilter===k}">${t}</button>`).join('')}</div>
  <div class="species-tools"><input type="search" id="species-search" placeholder="Buscar por nome, tipo ou número…" aria-label="Buscar Pokémon"><button type="button" class="btn ${state.shinyView?'blue':'secondary'} tiny" data-action="toggle-shiny">✨ ${state.shinyView?'Shiny':'Normal'}</button></div>
- ${catalog.length?speciesCards(c):empty('🥚','Pokédex vazia',master?'Cadastre seu primeiro Pokémon original usando o formulário abaixo.':'Seu Mestre ainda não publicou Pokémon nesta campanha.')}
+ ${catalog.length?speciesCards(c):empty('🥚','Pokédex vazia',master?'Cadastre seu primeiro Pokémon original na aba Fichas e criação.':'Seu Mestre ainda não publicou Pokémon nesta campanha.')}
  <div class="note dex-explain">🔎 Pokémon não vistos aparecem como silhuetas. Quando o Mestre registra um encontro, a ficha é revelada. Receber um Pokémon marca automaticamente a espécie como capturada.</div>
- ${master?paper(edit?'EDITAR POKÉMON':'CADASTRAR POKÉMON',speciesForm(edit),'dashboard-paper'):''}
- ${master?paper('IMPORTAR / EXPORTAR',`<p class="subtle">Cadastre várias espécies de uma vez pelo modelo JSON. As imagens são enviadas separadamente.</p><a href="/pokedex-template.json" class="btn secondary full" download="Pokedex-Evolution-Modelo.json">⬇️ Baixar modelo JSON</a><form id="import-species-form" class="form-stack" style="margin-top:12px"><label class="field"><span>Arquivo JSON preenchido</span><input name="importFile" type="file" accept=".json,application/json" required></label>${btn('📥 Importar Pokémon','blue','full')}</form><button type="button" class="btn secondary full" data-action="export-species" style="margin-top:12px">📤 Exportar Pokédex</button>`,'dashboard-paper'):''}`;
+ `:''}
+ ${master&&state.dexSection==='manage'?`<div class="species-tools"><input type="search" id="species-search" placeholder="Buscar ficha…" aria-label="Buscar ficha"><button type="button" class="btn secondary tiny" data-action="toggle-shiny">✨ ${state.shinyView?'Shiny':'Normal'}</button></div>${speciesCards(c)}`:''}
+ ${master&&state.dexSection==='manage'?paper(edit?'EDITAR POKÉMON':'CADASTRAR POKÉMON',speciesForm(edit),'dashboard-paper'):''}
+ ${master&&state.dexSection==='manage'?paper('IMPORTAR / EXPORTAR',`<p class="subtle">Cadastre várias espécies de uma vez pelo modelo JSON. As imagens são enviadas separadamente.</p><a href="/pokedex-template.json" class="btn secondary full" download="Pokedex-Evolution-Modelo.json">⬇️ Baixar modelo JSON</a><form id="import-species-form" class="form-stack" style="margin-top:12px"><label class="field"><span>Arquivo JSON preenchido</span><input name="importFile" type="file" accept=".json,application/json" required></label>${btn('📥 Importar Pokémon','blue','full')}</form><button type="button" class="btn secondary full" data-action="export-species" style="margin-top:12px">📤 Exportar Pokédex</button>`,'dashboard-paper'):''}`;
 }
 function capturedPhoto(cap, species){
  const image=(cap.shiny?species?.images?.shiny:species?.images?.normal)||(cap.shiny?species?.images?.normal:'');
@@ -234,7 +238,7 @@ function dashboardEquipe(){
  ${master?(members.length?`<div class="picker"><label for="trainer-select">Treinador</label><select id="trainer-select">${members.map(u=>`<option value="${esc(u.id)}" ${u.id===selected?'selected':''}>${esc(u.trainer?.name||u.name)}</option>`).join('')}</select></div>`:empty('🧢','Ainda sem jogadores','Convide um jogador na seção Campanhas para entregar o primeiro Pokémon.')):''}
  ${master&&members.length&&state.species.some(x=>x.campaignId===c.id)?paper(edit?'EDITAR POKÉMON':'ENTREGAR POKÉMON',captureForm(c,edit),'dashboard-paper'):''}
  ${master&&members.length&&!state.species.some(x=>x.campaignId===c.id)?`<div class="note">Cadastre pelo menos uma espécie na Pokédex antes de entregar Pokémon.</div>`:''}
- ${master&&select?`<div class="section-title"><h2>🧢 ${esc(select.trainer?.name||select.name)}</h2></div>`:''}
+ ${master&&select?`${trainerPortrait(select.trainer)}<div class="section-title"><h2>🧢 ${esc(select.trainer?.name||select.name)}</h2></div>`:''}
  ${(selected||!master)?`<div class="stats"><div class="stat"><strong>${inTeam.length}/6</strong><span>Equipe ativa</span></div><div class="stat"><strong>${pc.length}</strong><span>Armazenados</span></div><div class="stat"><strong>${owned.filter(x=>x.shiny).length}</strong><span>Shiny</span></div></div>
  <div class="section-title"><h2>⚡ Equipe ativa</h2></div>
  <div class="team-slots">${Array.from({length:6},(_,i)=>{const cap=inTeam[i],sp=cap&&state.species.find(x=>x.id===cap.speciesId);return `<div class="team-slot ${cap?'filled':''}"><span>${cap?capturedPhoto(cap,sp):'＋'}</span><strong>${cap?esc(cap.nickname||sp?.name||'Pokémon'):'Vazio'}</strong><small>${cap?'Nv. '+cap.level:'Espaço '+(i+1)}</small></div>`}).join('')}</div>
@@ -243,9 +247,10 @@ function dashboardEquipe(){
  ${pc.length?pc.map(cap=>captureDetails(cap,c)).join(''):empty('📦','Nenhum Pokémon guardado','Pokémon retirados da equipe ficam aqui.')}
  <p class="subtle">As imagens vêm da Pokédex cadastrada pelo Mestre. O jogador pode organizar a equipe e editar apelido/anotações; o Mestre controla HP, níveis, experiência e golpes.</p>`:''}`;
 }
+function trainerPortrait(t){return t?.image?`<img class="trainer-portrait" src="${esc(t.image)}" alt="Personagem de ${esc(t.name||'treinador')}" loading="lazy">`:'';}
 function dashboardProfile(){const u=state.user;const t=u.trainer||{name:u.name,hometown:'',bio:''};return `
  <section class="hero-welcome"><span class="decor" aria-hidden="true">${u.role==='mestre'?'🧙':'🧢'}</span><span class="badge ${u.role==='mestre'?'red':'gold'}">${roleTitle().toUpperCase()}</span><h1>${esc(u.name)}</h1><p>@${esc(u.username)} • ${roleTitle()}</p></section>
- ${u.role==='jogador'?paper('FICHA DO TREINADOR',`<form id="trainer-form" class="form-stack"><label class="field"><span>Nome do treinador</span><input name="name" required minlength="2" maxlength="40" value="${esc(t.name)}"></label><label class="field"><span>Cidade de origem</span><input name="hometown" maxlength="60" value="${esc(t.hometown||'')}" placeholder="Sua cidade"></label><label class="field"><span>História resumida</span><textarea name="bio" maxlength="300" placeholder="Conte um pouco sobre seu treinador...">${esc(t.bio||'')}</textarea></label>${btn('💾 Salvar ficha','blue','full')}</form>`, 'dashboard-paper'):
+ ${u.role==='jogador'?paper('FICHA DO TREINADOR',`${trainerPortrait(t)}<form id="trainer-image-form" class="form-stack"><label class="field"><span>Imagem do personagem — PNG, JPG ou WEBP até 5 MB</span><input name="characterImage" type="file" accept="image/png,image/jpeg,image/webp" required></label>${btn('Enviar imagem','blue','full')}</form><p class="subtle">Visível para os participantes das suas campanhas.</p><form id="trainer-form" class="form-stack"><label class="field"><span>Nome do treinador</span><input name="name" required minlength="2" maxlength="40" value="${esc(t.name)}"></label><label class="field"><span>Cidade de origem</span><input name="hometown" maxlength="60" value="${esc(t.hometown||'')}" placeholder="Sua cidade"></label><label class="field"><span>História resumida</span><textarea name="bio" maxlength="300" placeholder="Conte um pouco sobre seu treinador...">${esc(t.bio||'')}</textarea></label>${btn('💾 Salvar ficha','blue','full')}</form>`, 'dashboard-paper'):
  paper('PAINEL DO MESTRE',`<p>Você possui acesso exclusivo à criação de campanhas, códigos de convite, gestão de jogadores e registro das espécies na Pokédex.</p><p class="subtle">Nas próximas versões, também poderá controlar batalhas e recompensas diretamente pelo aplicativo.</p>`, 'dashboard-paper')}
  ${paper('SUA CONTA',`<p><strong>Nome de usuário:</strong> @${esc(u.username)}</p><p><strong>Tipo:</strong> ${roleTitle()}</p><button type="button" class="btn ghost full" data-action="logout">🚪 Sair da conta</button>`, 'dashboard-paper')}`;}
 const itemCategories=['Pokébolas','Cura','Batalha','Evolução','Missão','Outros'];
@@ -361,7 +366,8 @@ function demoAPI(method,url,data={}) {
  }
  if(url==='/api/campaigns'){if(u.role!=='mestre')error('Só o Mestre cria campanhas.');let c={id:'c'+Date.now(),name:data.name,code:Math.random().toString(36).slice(2,9).toUpperCase(),masterId:u.id,memberIds:[]};demoDB.campaigns.push(c);for(const template of demoDB.items.filter(x=>x.campaignId==='demo-camp'))demoDB.items.push({...template,id:'new'+Math.random().toString(36).slice(2),campaignId:c.id});storeDemo();return{campaign:demoC(c)};}
  if(url==='/api/campaigns/join'){let c=demoDB.campaigns.find(x=>x.code===data.code.toUpperCase());if(!c)error('Código não encontrado.');if(u.role!=='jogador')error('Entre como Jogador.');if(!c.memberIds.includes(u.id))c.memberIds.push(u.id);storeDemo();return{campaign:demoC(c)};}
- if(url==='/api/trainer'){u.trainer={name:data.name,hometown:data.hometown,bio:data.bio};storeDemo();return{trainer:u.trainer};}
+ if(url==='/api/trainer/image'){u.trainer={...u.trainer,image:'data:image/webp;base64,'+data.base64};storeDemo();return{trainer:u.trainer};}
+ if(url==='/api/trainer'){u.trainer={...u.trainer,name:data.name,hometown:data.hometown,bio:data.bio};storeDemo();return{trainer:u.trainer};}
  let inv=url.match(/^\/api\/campaigns\/([^/]+)\/(items|inventory|wallet)(?:\/([^/]+))?(?:\/(update|use|adjust))?$/);
  if(inv){
   const c=demoDB.campaigns.find(x=>x.id===inv[1]);if(!c||(c.masterId!==u.id&&!c.memberIds.includes(u.id)))error('Campanha inválida.');
@@ -521,6 +527,7 @@ app.addEventListener('click',async e=>{
   if(!confirm(`Usar uma unidade de ${item.name}?`))return;
   try{state.busy=true;const r=await request('POST',`/api/campaigns/${b.dataset.id}/items/${value}/use`,{capturedId:healTarget});await refresh();notice(r.healed?`Poção utilizada! +${r.healed} HP recuperados.`:'Item utilizado e descontado da mochila!');}catch(err){notice(err.message,true);}finally{state.busy=false;}return;
  }
+ if(action==='dex-section'){state.dexSection=value;render();return;}
  if(action==='dex-filter'){state.dexFilter=value;render();return;}
  if(action==='dex-discovery'){
   try{state.busy=true;await request('POST',`/api/campaigns/${b.dataset.id}/discoveries`,{ownerId:b.dataset.trainer,speciesId:value,status:b.dataset.status});await refresh();notice(b.dataset.status==='seen'?'Encontro registrado na Pokédex!':'Registro de encontro removido.');}
@@ -531,7 +538,7 @@ app.addEventListener('click',async e=>{
  if(action==='edit-capture'){state.editingCaptureId=value;render();document.querySelector('#capture-form')?.scrollIntoView({behavior:'smooth',block:'start'});return;}
  if(action==='team-toggle'){try{state.busy=true;await request('POST',`/api/campaigns/${b.dataset.id}/captured/${value}/team`,{inTeam:b.dataset.on==='true'});await refresh();notice(b.dataset.on==='true'?'Pokémon adicionado à equipe!':'Pokémon enviado ao armazenamento!');}catch(err){notice(err.message,true);}finally{state.busy=false;}return;}
  if(action==='delete-capture'){if(!confirm('Remover este Pokémon do treinador?'))return;try{state.busy=true;await request('DELETE',`/api/campaigns/${b.dataset.id}/captured/${value}`);state.editingCaptureId=null;await refresh();notice('Pokémon removido do treinador.');}catch(err){notice(err.message,true);}finally{state.busy=false;}return;}
- if(action==='edit-species'){state.editingSpeciesId=value;render();document.querySelector('#add-species-form')?.scrollIntoView({behavior:'smooth',block:'start'});return;}
+ if(action==='edit-species'){state.dexSection='manage';state.editingSpeciesId=value;render();document.querySelector('#add-species-form')?.scrollIntoView({behavior:'smooth',block:'start'});return;}
  if(action==='cancel-edit'){state.editingSpeciesId=null;render();return;}
  if(action==='export-species'){
    const c=activeCampaign();if(!c)return;
@@ -602,6 +609,11 @@ app.addEventListener('submit',async e=>{
     const entries=Array.isArray(parsed)?parsed:parsed.species;
     if(!Array.isArray(entries)||!entries.length||entries.length>200)throw new Error('O JSON precisa conter de 1 a 200 Pokémon.');
     const result=await request('POST',`/api/campaigns/${c.id}/species/import`,{species:entries});await refresh();notice(`${result.imported} Pokémon importados!`);
+  } else if(form.id==='trainer-image-form'){
+    const file=data.characterImage;
+    if(!(file instanceof File)||!file.size||file.size>5_000_000)throw new Error('Escolha uma imagem de até 5 MB.');
+    if(!['image/png','image/jpeg','image/webp'].includes(file.type))throw new Error('Use PNG, JPG ou WEBP.');
+    await request('POST','/api/trainer/image',{base64:DEMO?await compressDemoImage(file):await readFileBase64(file)});await refresh();notice('Imagem do personagem salva!');
   } else if(form.id==='trainer-form'){
     await request('POST','/api/trainer',data);await refresh();notice('Ficha do treinador atualizada!');
   }
@@ -622,3 +634,4 @@ app.addEventListener('submit',async e=>{
    if(!DEMO && 'serviceWorker' in navigator && (location.protocol==='https:' || location.hostname==='localhost'))navigator.serviceWorker.register('/sw.js').catch(()=>{});}
  catch(err){app.innerHTML=`<main class="screen auth-screen"><header class="brand"><div class="brand-top">Pokémon</div><div class="brand-bottom">EVOLUTION</div><div class="brand-rpg">RPG</div></header>${paper('SEM CONEXÃO',`<div class="empty"><div class="emoji">📡</div><h3>Não foi possível acessar o servidor</h3><p>O EvoLink precisa do servidor Node.js para cadastro e login reais. Se quiser apenas conhecer a interface, abra o arquivo <strong>demo.html</strong>.</p><button class="btn primary full" data-action="reload">Tentar novamente</button></div>`)}</main>`;notice('Conexão indisponível.',true);}
 })();
+

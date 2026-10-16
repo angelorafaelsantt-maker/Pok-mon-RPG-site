@@ -1,4 +1,4 @@
-const CACHE = 'evolink-shell-v6';
+const CACHE = 'evolink-shell-v7';
 const FILES = ['/', '/index.html', '/style.css', '/app.js', '/landscape.svg', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon-512.png'];
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting()));
@@ -16,3 +16,4 @@ self.addEventListener('fetch', event => {
     return resp;
   }).catch(()=>caches.match(request)));
 });
+

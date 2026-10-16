@@ -1,0 +1,286 @@
+--- a/server.js
++++ b/server.js
+@@ -18,6 +18,8 @@
+ }
+ const PORT = Number(process.env.PORT || 3000);
+ const MEDIA_DIR = path.join(DATA_DIR, 'species-images');
++const TRAINER_MEDIA_DIR = path.join(DATA_DIR, 'trainer-images');
++const MAX_TRAINER_IMAGE_BYTES = 5_000_000;
+ const MAX_IMAGE_BYTES = 20_000_000; // 20 MB por arte normal/shiny
+ const MAX_IMAGE_BODY_BYTES = Math.ceil(MAX_IMAGE_BYTES * 4 / 3) + 2048;
+ const MAX_ITEMS_PER_CAMPAIGN = 150;
+@@ -179,6 +181,34 @@
+   save();
+   if(old?.startsWith(`/api/species-media/${campaignId}/`)){try{fs.unlinkSync(path.join(dir,path.basename(old)));}catch{}}
+   return sp;
++}
++function receiveTrainerImage(user,data) {
++  if(user.role!=='jogador')fail(403,'Esta ficha é destinada aos jogadores.');
++  if(typeof data.base64!=='string'||data.base64.length>Math.ceil(MAX_TRAINER_IMAGE_BYTES*4/3)||!/^[a-zA-Z0-9+/]+={0,2}$/.test(data.base64))fail(400,'Use uma imagem PNG, JPG ou WEBP de até 5 MB.');
++  const buf=Buffer.from(data.base64,'base64');
++  if(buf.length<20||buf.length>MAX_TRAINER_IMAGE_BYTES)fail(400,'A imagem deve ter até 5 MB.');
++  const png=buf.subarray(0,8).equals(Buffer.from('89504e470d0a1a0a','hex'));
++  const jpg=buf[0]===255&&buf[1]===216&&buf[2]===255;
++  const webp=buf.toString('ascii',0,4)==='RIFF'&&buf.toString('ascii',8,12)==='WEBP';
++  if(!png&&!jpg&&!webp)fail(400,'Use imagem PNG, JPG ou WEBP válida.');
++  fs.mkdirSync(TRAINER_MEDIA_DIR,{recursive:true});
++  const file=`${user.id}-${id()}.${png?'png':jpg?'jpg':'webp'}`;
++  fs.writeFileSync(path.join(TRAINER_MEDIA_DIR,file),buf,{flag:'wx',mode:0o600});
++  const previous=user.trainer;
++  user.trainer={name:user.name,hometown:'',bio:'',...previous,image:`/api/trainer-media/${file}`};
++  try {save();}catch(error){user.trainer=previous;fs.unlinkSync(path.join(TRAINER_MEDIA_DIR,file));throw error;}
++  if(previous?.image?.startsWith('/api/trainer-media/')){try{fs.unlinkSync(path.join(TRAINER_MEDIA_DIR,path.basename(previous.image)));}catch{}}
++  return user.trainer;
++}
++function serveTrainerMedia(req,res,pathname) {
++  const viewer=auth(req);
++  const match=pathname.match(/^\/api\/trainer-media\/([a-f\d-]{36})-[a-f\d-]{36}\.(png|jpg|webp)$/);
++  const target=match&&db.users.find(u=>u.id===match[1]&&u.trainer?.image===pathname);
++  if(!target || (viewer.id!==target.id&&!db.campaigns.some(c=>c.memberIds.includes(target.id)&&(c.masterId===viewer.id||c.memberIds.includes(viewer.id)))))fail(404,'Imagem não encontrada.');
++  const file=path.join(TRAINER_MEDIA_DIR,path.basename(pathname));
++  if(!fs.existsSync(file))fail(404,'Imagem não encontrada.');
++  const buf=fs.readFileSync(file);
++  res.writeHead(200,{'Content-Type':`image/${match[2]==='jpg'?'jpeg':match[2]}`,'Content-Length':buf.length,'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'});res.end(buf);
+ }
+ function recordDiscovery(campaignId, ownerId, speciesId, status) {
+   const old=db.discoveries.find(d=>d.campaignId===campaignId&&d.ownerId===ownerId&&d.speciesId===speciesId);
+@@ -297,6 +327,7 @@
+     const gm=db.users.find(u=>u.id===campaign.masterId);
+     return response(res,200,{valid:true,campaign:{name:campaign.name,masterName:gm?.name||'Mestre'}});
+   }
++  if(req.method==='GET'&&pathname.startsWith('/api/trainer-media/'))return serveTrainerMedia(req,res,pathname);
+   if(req.method==='GET'&&pathname.startsWith('/api/species-media/'))return serveMedia(req,res,pathname);
+   if(req.method==='GET' && pathname==='/api/me') {
+     const user=currentUser(req);return response(res,200,{user:user?safeUser(user):null,campaigns:user?db.campaigns.filter(c=>c.masterId===user.id||c.memberIds.includes(user.id)).map(c=>campaignInfo(c,user)):[],species:user?db.species.map(p=>publicSpeciesFor(user,p)).filter(Boolean):[],discoveries:user?db.discoveries.filter(d=>db.campaigns.some(c=>c.id===d.campaignId&&(c.masterId===user.id||(c.memberIds.includes(user.id)&&d.ownerId===user.id)))):[],captured:user?db.captured.filter(p=>db.campaigns.some(c=>c.id===p.campaignId&&(c.masterId===user.id||(c.memberIds.includes(user.id)&&p.ownerId===user.id)))).map(safeCaptured):[],items:user?db.items.filter(x=>db.campaigns.some(c=>c.id===x.campaignId&&(c.masterId===user.id||c.memberIds.includes(user.id)))):[],inventory:user?db.inventory.filter(x=>db.campaigns.some(c=>c.id===x.campaignId&&(c.masterId===user.id||(c.memberIds.includes(user.id)&&x.ownerId===user.id)))):[],wallets:user?db.wallets.filter(x=>db.campaigns.some(c=>c.id===x.campaignId&&(c.masterId===user.id||(c.memberIds.includes(user.id)&&x.ownerId===user.id)))):[],itemHistory:user?db.itemHistory.filter(x=>db.campaigns.some(c=>c.id===x.campaignId&&(c.masterId===user.id||(c.memberIds.includes(user.id)&&x.ownerId===user.id)))).slice(-150):[]});
+@@ -310,7 +341,7 @@
+     const token=cookie(req,'evolink_session'); if(token){db.sessions=db.sessions.filter(s=>s.hash!==sessionHash(token));save();}
+     res.setHeader('Set-Cookie','evolink_session=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0');return response(res,200,{ok:true});
+   }
+-  const data=req.method==='POST'?await readJSON(req,pathname.endsWith('/image')?MAX_IMAGE_BODY_BYTES:pathname.endsWith('/import')?2_500_000:32768):{};
++  const data=req.method==='POST'?await readJSON(req,pathname==='/api/trainer/image'?Math.ceil(MAX_TRAINER_IMAGE_BYTES*4/3)+2048:pathname.endsWith('/image')?MAX_IMAGE_BODY_BYTES:pathname.endsWith('/import')?2_500_000:32768):{};
+   if(req.method==='POST' && pathname==='/api/register') {
+     rateLimit(req);
+     const username=clean(data.username,25).toLowerCase();const password=data.password;const name=clean(data.name,40);const role=data.role;
+@@ -347,10 +378,11 @@
+   if(req.method==='POST'&&memberRoute){const c=owner(req,memberRoute[1]);const memberId=clean(data.memberId,50);c.memberIds=c.memberIds.filter(x=>x!==memberId);save();return response(res,200,{campaign:campaignInfo(c)});}
+   const recodeRoute=pathname.match(/^\/api\/campaigns\/([a-f\d-]+)\/reissue-code$/);
+   if(req.method==='POST'&&recodeRoute){const c=owner(req,recodeRoute[1]);c.code=newCode();save();return response(res,200,{campaign:campaignInfo(c)});}
++  if(req.method==='POST'&&pathname==='/api/trainer/image'){return response(res,200,{trainer:receiveTrainerImage(auth(req),data)});}
+   if(req.method==='POST'&&pathname==='/api/trainer'){
+     const u=auth(req);if(u.role!=='jogador')fail(403,'Esta ficha é destinada aos jogadores.');
+     const name=clean(data.name,40);if(name.length<2)fail(400,'Nome de treinador muito curto.');
+-    u.trainer={name,hometown:clean(data.hometown,60),bio:clean(data.bio,300)};save();return response(res,200,{trainer:u.trainer});
++    u.trainer={...u.trainer,name,hometown:clean(data.hometown,60),bio:clean(data.bio,300)};save();return response(res,200,{trainer:u.trainer});
+   }
+   // O Mestre registra encontros; jogadores não podem marcar Pokémon por conta própria.
+   const encounter=pathname.match(/^\/api\/campaigns\/([a-f\d-]+)\/discoveries$/);
+--- a/app.js
++++ b/app.js
+@@ -59,7 +59,7 @@
+ function campaignCards() {
+  return state.campaigns.map(c=>`<article class="list-card"><div class="row"><h3>${esc(c.name)}</h3><span class="badge">${c.members.length} jogador(es)</span></div><p>Organização: ${esc(c.masterName)}</p>
+   ${state.user.role==='mestre'?`<div class="row"><span class="code" aria-label="Código da campanha">${esc(c.code)}</span><button type="button" class="btn secondary tiny" data-action="copy-code" data-value="${esc(c.code)}">📋 Copiar código</button></div><div class="row" style="margin-top:10px"><button type="button" class="btn blue tiny" data-action="share-invite" data-value="${esc(c.code)}" data-name="${esc(c.name)}">📨 Compartilhar convite</button><button type="button" class="btn tiny ghost" data-action="recode" data-value="${esc(c.id)}">🔄 Trocar código</button></div>${DEMO?'<div class="demo-online-warning">⚠️ O código desta demonstração funciona somente neste navegador. Para convidar outros celulares, abra a versão hospedada online.</div>':''}`:''}
+-  ${state.user.role==='mestre'?`<hr><strong style="font-size:13px">Participantes</strong>${c.members.length?`<div class="members" style="margin-top:9px">${c.members.map(u=>`<div class="member"><span>🧢 ${esc(u.trainer?.name||u.name)}<br><small>@${esc(u.username)}</small></span><button type="button" class="btn tiny ghost" data-action="remove-member" data-id="${esc(c.id)}" data-value="${esc(u.id)}">Remover</button></div>`).join('')}</div>`:'<p>Nenhum jogador entrou ainda. Compartilhe o código acima!</p>'}`:''}
++  ${`<hr><strong style="font-size:13px">Participantes</strong>${c.members.length?`<div class="members" style="margin-top:9px">${c.members.map(u=>`<div class="member">${trainerPortrait(u.trainer)}<span>🧢 ${esc(u.trainer?.name||u.name)}<br><small>@${esc(u.username)}</small></span>${state.user.role==='mestre'?`<button type="button" class="btn tiny ghost" data-action="remove-member" data-id="${esc(c.id)}" data-value="${esc(u.id)}">Remover</button>`:''}</div>`).join('')}</div>`:'<p>Nenhum jogador entrou ainda. Compartilhe o código acima!</p>'}`}
+  </article>`).join('');
+ }
+ function dashboardCampaigns(){const master=state.user.role==='mestre';return `
+@@ -117,12 +117,13 @@
+  return '<span class="dex-marker catalog">📖 Catálogo</span>';
+ }
+ function speciesCards(c){
+- const trainer=dexTrainer(c);
+  const master=state.user.role==='mestre';
++ const managing=master&&state.dexSection==='manage';
++ const trainer=managing?null:dexTrainer(c);
+  const all=state.species.filter(p=>p.campaignId===c.id).sort((a,b)=>a.number-b.number);
+  const filtered=all.filter(p=>{
+   const st=dexStatus(p,c,trainer);
+-  return state.dexFilter==='all'||(state.dexFilter==='seen'&&(st==='seen'||st==='caught'))||st===state.dexFilter;
++  return managing||state.dexFilter==='all'||(state.dexFilter==='seen'&&(st==='seen'||st==='caught'))||st===state.dexFilter;
+  });
+  return filtered.map(p=>{
+   const status=dexStatus(p,c,trainer),undiscovered=(p.unknown===true||(!master&&status==='unknown'));
+@@ -148,8 +149,8 @@
+    </details>`}
+    ${master?`<div class="dex-card-actions">
+     ${trainer?`<button type="button" class="btn tiny ${status==='unknown'?'blue':'secondary'}" data-action="dex-discovery" data-id="${esc(c.id)}" data-trainer="${esc(trainer)}" data-value="${esc(p.id)}" data-status="${status==='unknown'?'seen':'unseen'}">${status==='unknown'?'👁 Marcar visto':'↶ Resetar visto'}</button>`:''}
+-    <button type="button" class="btn tiny secondary" data-action="edit-species" data-value="${esc(p.id)}">✏️ Editar</button>
+-    <button type="button" class="btn tiny ghost" data-action="delete-species" data-value="${esc(p.id)}" data-id="${esc(c.id)}">Excluir</button>
++    ${managing?`<button type="button" class="btn tiny secondary" data-action="edit-species" data-value="${esc(p.id)}">✏️ Editar</button>
++    <button type="button" class="btn tiny ghost" data-action="delete-species" data-value="${esc(p.id)}" data-id="${esc(c.id)}">Excluir</button>`:''}
+    </div>`:''}
+   </article>`;
+  }).join('')||empty('🔎','Nenhuma espécie encontrada','Altere o filtro para visualizar outros Pokémon.');
+@@ -161,17 +162,20 @@
+  const catalog=state.species.filter(p=>p.campaignId===c.id);
+  const counts={seen:0,caught:0,unknown:0};for(const sp of catalog){const st=dexStatus(sp,c,trainer);if(st==='caught'){counts.caught++;counts.seen++;}else if(st==='seen')counts.seen++;else counts.unknown++;}
+  return `${campaignPicker()}<section class="hero-welcome"><span class="badge gold">📘 POKÉDEX EVOLUTION</span><h1>${esc(c.name)}</h1><p>${master?'Acompanhe as descobertas de cada treinador.':'Descubra Pokémon durante sua jornada!'} • ${catalog.length} registros disponíveis</p></section>
+- ${master&&c.members.length?`<div class="picker"><label for="dex-trainer-select">Pokédex do treinador</label><select id="dex-trainer-select">${c.members.map(m=>`<option value="${esc(m.id)}" ${trainer===m.id?'selected':''}>${esc(m.trainer?.name||m.name)}</option>`).join('')}</select></div>`:''}
++ ${master?`<div class="dex-filter-bar" role="group" aria-label="Seções da Pokédex">${[['pokemon','Pokémon'],['manage','Fichas e criação']].map(([key,label])=>`<button type="button" class="dex-tab ${(state.dexSection||'pokemon')===key?'active':''}" data-action="dex-section" data-value="${key}" aria-pressed="${(state.dexSection||'pokemon')===key}">${label}</button>`).join('')}</div>`:''}
++ ${!master||state.dexSection!=='manage'?` ${master&&c.members.length?`<div class="picker"><label for="dex-trainer-select">Pokédex do treinador</label><select id="dex-trainer-select">${c.members.map(m=>`<option value="${esc(m.id)}" ${trainer===m.id?'selected':''}>${esc(m.trainer?.name||m.name)}</option>`).join('')}</select></div>`:''}
+  ${master&&!c.members.length?'<div class="note">Convide jogadores para registrar encontros e acompanhar seus progressos pessoais.</div>':''}
+  <div class="dex-progress" aria-label="Progresso da Pokédex">
+   <div><span>👁 Vistos</span><strong>${counts.seen}</strong></div><div><span>◉ Capturados</span><strong>${counts.caught}</strong></div><div><span>🔒 Desconhecidos</span><strong>${counts.unknown}</strong></div>
+  </div>
+  <div class="dex-filter-bar" role="group" aria-label="Filtrar Pokédex">${[['all','Todos'],['seen','Vistos'],['caught','Capturados'],['unknown','Não vistos']].map(([k,t])=>`<button type="button" class="dex-tab ${state.dexFilter===k?'active':''}" data-action="dex-filter" data-value="${k}" aria-pressed="${state.dexFilter===k}">${t}</button>`).join('')}</div>
+  <div class="species-tools"><input type="search" id="species-search" placeholder="Buscar por nome, tipo ou número…" aria-label="Buscar Pokémon"><button type="button" class="btn ${state.shinyView?'blue':'secondary'} tiny" data-action="toggle-shiny">✨ ${state.shinyView?'Shiny':'Normal'}</button></div>
+- ${catalog.length?speciesCards(c):empty('🥚','Pokédex vazia',master?'Cadastre seu primeiro Pokémon original usando o formulário abaixo.':'Seu Mestre ainda não publicou Pokémon nesta campanha.')}
++ ${catalog.length?speciesCards(c):empty('🥚','Pokédex vazia',master?'Cadastre seu primeiro Pokémon original na aba Fichas e criação.':'Seu Mestre ainda não publicou Pokémon nesta campanha.')}
+  <div class="note dex-explain">🔎 Pokémon não vistos aparecem como silhuetas. Quando o Mestre registra um encontro, a ficha é revelada. Receber um Pokémon marca automaticamente a espécie como capturada.</div>
+- ${master?paper(edit?'EDITAR POKÉMON':'CADASTRAR POKÉMON',speciesForm(edit),'dashboard-paper'):''}
+- ${master?paper('IMPORTAR / EXPORTAR',`<p class="subtle">Cadastre várias espécies de uma vez pelo modelo JSON. As imagens são enviadas separadamente.</p><a href="/pokedex-template.json" class="btn secondary full" download="Pokedex-Evolution-Modelo.json">⬇️ Baixar modelo JSON</a><form id="import-species-form" class="form-stack" style="margin-top:12px"><label class="field"><span>Arquivo JSON preenchido</span><input name="importFile" type="file" accept=".json,application/json" required></label>${btn('📥 Importar Pokémon','blue','full')}</form><button type="button" class="btn secondary full" data-action="export-species" style="margin-top:12px">📤 Exportar Pokédex</button>`,'dashboard-paper'):''}`;
++ `:''}
++ ${master&&state.dexSection==='manage'?`<div class="species-tools"><input type="search" id="species-search" placeholder="Buscar ficha…" aria-label="Buscar ficha"><button type="button" class="btn secondary tiny" data-action="toggle-shiny">✨ ${state.shinyView?'Shiny':'Normal'}</button></div>${speciesCards(c)}`:''}
++ ${master&&state.dexSection==='manage'?paper(edit?'EDITAR POKÉMON':'CADASTRAR POKÉMON',speciesForm(edit),'dashboard-paper'):''}
++ ${master&&state.dexSection==='manage'?paper('IMPORTAR / EXPORTAR',`<p class="subtle">Cadastre várias espécies de uma vez pelo modelo JSON. As imagens são enviadas separadamente.</p><a href="/pokedex-template.json" class="btn secondary full" download="Pokedex-Evolution-Modelo.json">⬇️ Baixar modelo JSON</a><form id="import-species-form" class="form-stack" style="margin-top:12px"><label class="field"><span>Arquivo JSON preenchido</span><input name="importFile" type="file" accept=".json,application/json" required></label>${btn('📥 Importar Pokémon','blue','full')}</form><button type="button" class="btn secondary full" data-action="export-species" style="margin-top:12px">📤 Exportar Pokédex</button>`,'dashboard-paper'):''}`;
+ }
+ function capturedPhoto(cap, species){
+  const image=(cap.shiny?species?.images?.shiny:species?.images?.normal)||(cap.shiny?species?.images?.normal:'');
+@@ -234,7 +238,7 @@
+  ${master?(members.length?`<div class="picker"><label for="trainer-select">Treinador</label><select id="trainer-select">${members.map(u=>`<option value="${esc(u.id)}" ${u.id===selected?'selected':''}>${esc(u.trainer?.name||u.name)}</option>`).join('')}</select></div>`:empty('🧢','Ainda sem jogadores','Convide um jogador na seção Campanhas para entregar o primeiro Pokémon.')):''}
+  ${master&&members.length&&state.species.some(x=>x.campaignId===c.id)?paper(edit?'EDITAR POKÉMON':'ENTREGAR POKÉMON',captureForm(c,edit),'dashboard-paper'):''}
+  ${master&&members.length&&!state.species.some(x=>x.campaignId===c.id)?`<div class="note">Cadastre pelo menos uma espécie na Pokédex antes de entregar Pokémon.</div>`:''}
+- ${master&&select?`<div class="section-title"><h2>🧢 ${esc(select.trainer?.name||select.name)}</h2></div>`:''}
++ ${master&&select?`${trainerPortrait(select.trainer)}<div class="section-title"><h2>🧢 ${esc(select.trainer?.name||select.name)}</h2></div>`:''}
+  ${(selected||!master)?`<div class="stats"><div class="stat"><strong>${inTeam.length}/6</strong><span>Equipe ativa</span></div><div class="stat"><strong>${pc.length}</strong><span>Armazenados</span></div><div class="stat"><strong>${owned.filter(x=>x.shiny).length}</strong><span>Shiny</span></div></div>
+  <div class="section-title"><h2>⚡ Equipe ativa</h2></div>
+  <div class="team-slots">${Array.from({length:6},(_,i)=>{const cap=inTeam[i],sp=cap&&state.species.find(x=>x.id===cap.speciesId);return `<div class="team-slot ${cap?'filled':''}"><span>${cap?capturedPhoto(cap,sp):'＋'}</span><strong>${cap?esc(cap.nickname||sp?.name||'Pokémon'):'Vazio'}</strong><small>${cap?'Nv. '+cap.level:'Espaço '+(i+1)}</small></div>`}).join('')}</div>
+@@ -243,9 +247,10 @@
+  ${pc.length?pc.map(cap=>captureDetails(cap,c)).join(''):empty('📦','Nenhum Pokémon guardado','Pokémon retirados da equipe ficam aqui.')}
+  <p class="subtle">As imagens vêm da Pokédex cadastrada pelo Mestre. O jogador pode organizar a equipe e editar apelido/anotações; o Mestre controla HP, níveis, experiência e golpes.</p>`:''}`;
+ }
++function trainerPortrait(t){return t?.image?`<img class="trainer-portrait" src="${esc(t.image)}" alt="Personagem de ${esc(t.name||'treinador')}" loading="lazy">`:'';}
+ function dashboardProfile(){const u=state.user;const t=u.trainer||{name:u.name,hometown:'',bio:''};return `
+  <section class="hero-welcome"><span class="decor" aria-hidden="true">${u.role==='mestre'?'🧙':'🧢'}</span><span class="badge ${u.role==='mestre'?'red':'gold'}">${roleTitle().toUpperCase()}</span><h1>${esc(u.name)}</h1><p>@${esc(u.username)} • ${roleTitle()}</p></section>
+- ${u.role==='jogador'?paper('FICHA DO TREINADOR',`<form id="trainer-form" class="form-stack"><label class="field"><span>Nome do treinador</span><input name="name" required minlength="2" maxlength="40" value="${esc(t.name)}"></label><label class="field"><span>Cidade de origem</span><input name="hometown" maxlength="60" value="${esc(t.hometown||'')}" placeholder="Sua cidade"></label><label class="field"><span>História resumida</span><textarea name="bio" maxlength="300" placeholder="Conte um pouco sobre seu treinador...">${esc(t.bio||'')}</textarea></label>${btn('💾 Salvar ficha','blue','full')}</form>`, 'dashboard-paper'):
++ ${u.role==='jogador'?paper('FICHA DO TREINADOR',`${trainerPortrait(t)}<form id="trainer-image-form" class="form-stack"><label class="field"><span>Imagem do personagem — PNG, JPG ou WEBP até 5 MB</span><input name="characterImage" type="file" accept="image/png,image/jpeg,image/webp" required></label>${btn('Enviar imagem','blue','full')}</form><p class="subtle">Visível para os participantes das suas campanhas.</p><form id="trainer-form" class="form-stack"><label class="field"><span>Nome do treinador</span><input name="name" required minlength="2" maxlength="40" value="${esc(t.name)}"></label><label class="field"><span>Cidade de origem</span><input name="hometown" maxlength="60" value="${esc(t.hometown||'')}" placeholder="Sua cidade"></label><label class="field"><span>História resumida</span><textarea name="bio" maxlength="300" placeholder="Conte um pouco sobre seu treinador...">${esc(t.bio||'')}</textarea></label>${btn('💾 Salvar ficha','blue','full')}</form>`, 'dashboard-paper'):
+  paper('PAINEL DO MESTRE',`<p>Você possui acesso exclusivo à criação de campanhas, códigos de convite, gestão de jogadores e registro das espécies na Pokédex.</p><p class="subtle">Nas próximas versões, também poderá controlar batalhas e recompensas diretamente pelo aplicativo.</p>`, 'dashboard-paper')}
+  ${paper('SUA CONTA',`<p><strong>Nome de usuário:</strong> @${esc(u.username)}</p><p><strong>Tipo:</strong> ${roleTitle()}</p><button type="button" class="btn ghost full" data-action="logout">🚪 Sair da conta</button>`, 'dashboard-paper')}`;}
+ const itemCategories=['Pokébolas','Cura','Batalha','Evolução','Missão','Outros'];
+@@ -361,7 +366,8 @@
+  }
+  if(url==='/api/campaigns'){if(u.role!=='mestre')error('Só o Mestre cria campanhas.');let c={id:'c'+Date.now(),name:data.name,code:Math.random().toString(36).slice(2,9).toUpperCase(),masterId:u.id,memberIds:[]};demoDB.campaigns.push(c);for(const template of demoDB.items.filter(x=>x.campaignId==='demo-camp'))demoDB.items.push({...template,id:'new'+Math.random().toString(36).slice(2),campaignId:c.id});storeDemo();return{campaign:demoC(c)};}
+  if(url==='/api/campaigns/join'){let c=demoDB.campaigns.find(x=>x.code===data.code.toUpperCase());if(!c)error('Código não encontrado.');if(u.role!=='jogador')error('Entre como Jogador.');if(!c.memberIds.includes(u.id))c.memberIds.push(u.id);storeDemo();return{campaign:demoC(c)};}
+- if(url==='/api/trainer'){u.trainer={name:data.name,hometown:data.hometown,bio:data.bio};storeDemo();return{trainer:u.trainer};}
++ if(url==='/api/trainer/image'){u.trainer={...u.trainer,image:'data:image/webp;base64,'+data.base64};storeDemo();return{trainer:u.trainer};}
++ if(url==='/api/trainer'){u.trainer={...u.trainer,name:data.name,hometown:data.hometown,bio:data.bio};storeDemo();return{trainer:u.trainer};}
+  let inv=url.match(/^\/api\/campaigns\/([^/]+)\/(items|inventory|wallet)(?:\/([^/]+))?(?:\/(update|use|adjust))?$/);
+  if(inv){
+   const c=demoDB.campaigns.find(x=>x.id===inv[1]);if(!c||(c.masterId!==u.id&&!c.memberIds.includes(u.id)))error('Campanha inválida.');
+@@ -521,6 +527,7 @@
+   if(!confirm(`Usar uma unidade de ${item.name}?`))return;
+   try{state.busy=true;const r=await request('POST',`/api/campaigns/${b.dataset.id}/items/${value}/use`,{capturedId:healTarget});await refresh();notice(r.healed?`Poção utilizada! +${r.healed} HP recuperados.`:'Item utilizado e descontado da mochila!');}catch(err){notice(err.message,true);}finally{state.busy=false;}return;
+  }
++ if(action==='dex-section'){state.dexSection=value;render();return;}
+  if(action==='dex-filter'){state.dexFilter=value;render();return;}
+  if(action==='dex-discovery'){
+   try{state.busy=true;await request('POST',`/api/campaigns/${b.dataset.id}/discoveries`,{ownerId:b.dataset.trainer,speciesId:value,status:b.dataset.status});await refresh();notice(b.dataset.status==='seen'?'Encontro registrado na Pokédex!':'Registro de encontro removido.');}
+@@ -531,7 +538,7 @@
+  if(action==='edit-capture'){state.editingCaptureId=value;render();document.querySelector('#capture-form')?.scrollIntoView({behavior:'smooth',block:'start'});return;}
+  if(action==='team-toggle'){try{state.busy=true;await request('POST',`/api/campaigns/${b.dataset.id}/captured/${value}/team`,{inTeam:b.dataset.on==='true'});await refresh();notice(b.dataset.on==='true'?'Pokémon adicionado à equipe!':'Pokémon enviado ao armazenamento!');}catch(err){notice(err.message,true);}finally{state.busy=false;}return;}
+  if(action==='delete-capture'){if(!confirm('Remover este Pokémon do treinador?'))return;try{state.busy=true;await request('DELETE',`/api/campaigns/${b.dataset.id}/captured/${value}`);state.editingCaptureId=null;await refresh();notice('Pokémon removido do treinador.');}catch(err){notice(err.message,true);}finally{state.busy=false;}return;}
+- if(action==='edit-species'){state.editingSpeciesId=value;render();document.querySelector('#add-species-form')?.scrollIntoView({behavior:'smooth',block:'start'});return;}
++ if(action==='edit-species'){state.dexSection='manage';state.editingSpeciesId=value;render();document.querySelector('#add-species-form')?.scrollIntoView({behavior:'smooth',block:'start'});return;}
+  if(action==='cancel-edit'){state.editingSpeciesId=null;render();return;}
+  if(action==='export-species'){
+    const c=activeCampaign();if(!c)return;
+@@ -602,6 +609,11 @@
+     const entries=Array.isArray(parsed)?parsed:parsed.species;
+     if(!Array.isArray(entries)||!entries.length||entries.length>200)throw new Error('O JSON precisa conter de 1 a 200 Pokémon.');
+     const result=await request('POST',`/api/campaigns/${c.id}/species/import`,{species:entries});await refresh();notice(`${result.imported} Pokémon importados!`);
++  } else if(form.id==='trainer-image-form'){
++    const file=data.characterImage;
++    if(!(file instanceof File)||!file.size||file.size>5_000_000)throw new Error('Escolha uma imagem de até 5 MB.');
++    if(!['image/png','image/jpeg','image/webp'].includes(file.type))throw new Error('Use PNG, JPG ou WEBP.');
++    await request('POST','/api/trainer/image',{base64:DEMO?await compressDemoImage(file):await readFileBase64(file)});await refresh();notice('Imagem do personagem salva!');
+   } else if(form.id==='trainer-form'){
+     await request('POST','/api/trainer',data);await refresh();notice('Ficha do treinador atualizada!');
+   }
+--- a/style.css
++++ b/style.css
+@@ -104,3 +104,5 @@
+ /* v0.6 — alerta de compartilhamento local */
+ .demo-online-warning{border-radius:10px;background:#fff0df;border:2px solid #dc9554;color:#7a4426;font-size:12px;padding:11px;margin-top:10px;font-weight:750;line-height:1.5}
+ 
++
++.trainer-portrait{width:96px;height:96px;object-fit:contain;border-radius:12px;background:#fff;flex-shrink:0}.member .trainer-portrait{width:64px;height:64px}
+--- a/sw.js
++++ b/sw.js
+@@ -1,4 +1,4 @@
+-const CACHE = 'evolink-shell-v6';
++const CACHE = 'evolink-shell-v7';
+ const FILES = ['/', '/index.html', '/style.css', '/app.js', '/landscape.svg', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon-512.png'];
+ self.addEventListener('install', event => {
+   event.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting()));
+--- a/Dockerfile-1
++++ b/Dockerfile-1
+@@ -11,6 +11,7 @@
+     busybox unzip -q "$archive" -d /tmp/evolink-extracted; \
+     cp -R /tmp/evolink-extracted/evolink-pokemon-rpg/. /app/; \
+     cp /tmp/evolink-repo/server.js /app/server.js; \
++    cp /tmp/evolink-repo/app.js /tmp/evolink-repo/style.css /tmp/evolink-repo/sw.js /app/public/; \
+     test -s /app/public/index.html || { echo 'ERRO: arquivo public/index.html ausente do aplicativo.' >&2; exit 1; }; \
+     test -s /app/server.js || { echo 'ERRO: arquivo server.js ausente.' >&2; exit 1; }; \
+     mkdir -p /app/data; \
+--- /dev/null
++++ b/tests/profile.test.js
+@@ -0,0 +1,58 @@
++const {test}=require('node:test');
++const assert=require('node:assert/strict');
++const fs=require('node:fs');
++const os=require('node:os');
++const path=require('node:path');
++const vm=require('node:vm');
++const root=path.resolve(__dirname,'..');
++test('character uploads, campaign access, validation and persistence',async()=>{
++ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'evolink-test-'));process.env.DATA_DIR=dir;
++ const modulePath=path.join(root,'server.js');let server;
++ async function start(){delete require.cache[require.resolve(modulePath)];server=require(modulePath).createServer();}
++ await start();
++ const call=async(url,data,cookie)=>new Promise((resolve,reject)=>{
++ const {PassThrough}=require('node:stream');const req=new PassThrough();req.url=url;req.method=data?'POST':'GET';req.socket={remoteAddress:'test'};req.headers={host:'localhost','content-type':'application/json',...(cookie?{cookie}:{})};
++ const headers={};const res={headersSent:false,setHeader(k,v){headers[k.toLowerCase()]=v;},writeHead(status,h){this.status=status;Object.entries(h).forEach(([k,v])=>headers[k.toLowerCase()]=v);this.headersSent=true;},end(body){resolve({status:this.status,cookie:headers['set-cookie']?.split(';')[0],body:headers['content-type']?.includes('json')?JSON.parse(body):body});}};
++ server.emit('request',req,res);req.end(data?JSON.stringify(data):'');
++ });
++ try{
++ const reg=async(username,role='jogador')=>{const r=await call('/api/register',{username,role,name:username,password:'password123'});assert.equal(r.status,201);return r.cookie;};
++ const gm=await reg('master','mestre'),a=await reg('playera'),b=await reg('playerb'),outsider=await reg('outsider');
++ const c=(await call('/api/campaigns',{name:'Test campaign'},gm)).body.campaign;
++ await call('/api/campaigns/join',{code:c.code},a);await call('/api/campaigns/join',{code:c.code},b);
++ const species=(await call(`/api/campaigns/${c.id}/species`,{number:1,name:'Bulbasaur',type1:'Grama'},gm)).body.species;
++ let me=(await call('/api/me',null,a)).body;assert.equal(me.species[0].unknown,true);assert.equal(me.species[0].name,undefined);
++ const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aXZkAAAAASUVORK5CYII=','base64');
++ assert.equal((await call('/api/trainer/image',{base64:png.toString('base64')},gm)).status,403);
++ assert.equal((await call('/api/trainer/image',{base64:Buffer.from('<svg>invalid format here</svg>').toString('base64')},a)).status,400);
++ assert.equal((await call('/api/trainer/image',{base64:Buffer.alloc(5_000_001).toString('base64')},a)).status,400);
++ let image;
++ for(const buf of [png,Buffer.concat([Buffer.from([255,216,255]),Buffer.alloc(30)]),Buffer.concat([Buffer.from('RIFF0000WEBP'),Buffer.alloc(30)])]){
++ const old=image;const uploaded=await call('/api/trainer/image',{base64:buf.toString('base64')},a);assert.equal(uploaded.status,200);image=uploaded.body.trainer.image;
++ if(old)assert.equal((await call(old,null,a)).status,404);
++ assert.equal((await call(image,null,a)).status,200);
++ }
++ assert.equal((await call(image)).status,401);assert.equal((await call(image,null,outsider)).status,404);
++ assert.equal((await call(image,null,gm)).status,200);assert.equal((await call(image,null,b)).status,200);
++ await call('/api/trainer',{name:'New trainer',hometown:'Town',bio:'Story'},a);
++ assert.equal((await call('/api/me',null,a)).body.user.trainer.image,image);
++ assert.equal((await call('/api/me',null,b)).body.campaigns[0].members.find(m=>m.trainer.image===image).trainer.name,'New trainer');
++ server.close();await start();assert.equal((await call(image,null,a)).status,200);
++ me=(await call('/api/me',null,gm)).body;assert.equal(me.species[0].id,species.id);assert.equal(me.campaigns[0].members.length,2);
++ await call(`/api/campaigns/${c.id}/remove-member`,{memberId:(await call('/api/me',null,a)).body.user.id},gm);
++ assert.equal((await call(image,null,b)).status,404);
++ }finally{server.close();fs.rmSync(dir,{recursive:true,force:true});}
++});
++test('Pokédex sections, player silhouettes and profile rendering',()=>{
++ const source=fs.readFileSync(path.join(root,'app.js'),'utf8').split('(async()=>{')[0];
++ const el={addEventListener(){},dataset:{},classList:{}};
++ const ctx=vm.createContext({document:{body:{dataset:{}},getElementById(){return el;}},location:{search:''},URLSearchParams,localStorage:{getItem(){return null;}},window:{addEventListener(){}},navigator:{},setTimeout,clearTimeout,console});
++ vm.runInContext(source,ctx);
++ vm.runInContext(`state.user={id:'gm',role:'mestre',name:'GM'};state.campaigns=[{id:'c',name:'Test',members:[{id:'p',name:'Player',trainer:{name:'Player',image:'/api/trainer-media/test.png'}}]}];state.species=[{id:'s',campaignId:'c',name:'Testmon',number:1,type1:'Grama'}];`,ctx);
++ const render=()=>vm.runInContext('dashboardPokedex()',ctx);
++ let html=render();assert.match(html,/Fichas e criação/);assert.doesNotMatch(html,/id="add-species-form"|data-action="edit-species"/);
++ vm.runInContext("state.dexSection='manage';state.dexFilter='caught'",ctx);html=render();assert.match(html,/id="add-species-form"/);assert.match(html,/data-action="edit-species"/);assert.match(html,/import-species-form/);
++ vm.runInContext("state.user={id:'p',role:'jogador',name:'Player',trainer:{name:'Player'}};state.dexFilter='all'",ctx);html=render();assert.match(html,/monster-shadow/);assert.doesNotMatch(html,/Fichas e criação|add-species-form/);
++ assert.match(vm.runInContext('dashboardProfile()',ctx),/trainer-image-form/);
++ html=vm.runInContext('campaignCards()',ctx);assert.match(html,/trainer-portrait/);assert.doesNotMatch(html,/data-action="remove-member"/);
++});

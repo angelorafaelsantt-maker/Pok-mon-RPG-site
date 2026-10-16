@@ -18,6 +18,8 @@ if (process.env.RAILWAY_PROJECT_ID) {
 }
 const PORT = Number(process.env.PORT || 3000);
 const MEDIA_DIR = path.join(DATA_DIR, 'species-images');
+const TRAINER_MEDIA_DIR = path.join(DATA_DIR, 'trainer-images');
+const MAX_TRAINER_IMAGE_BYTES = 5_000_000;
 const MAX_IMAGE_BYTES = 20_000_000; // 20 MB por arte normal/shiny
 const MAX_IMAGE_BODY_BYTES = Math.ceil(MAX_IMAGE_BYTES * 4 / 3) + 2048;
 const MAX_ITEMS_PER_CAMPAIGN = 150;
@@ -180,6 +182,34 @@ function receiveImage(campaignId,speciesId,data) {
   if(old?.startsWith(`/api/species-media/${campaignId}/`)){try{fs.unlinkSync(path.join(dir,path.basename(old)));}catch{}}
   return sp;
 }
+function receiveTrainerImage(user,data) {
+  if(user.role!=='jogador')fail(403,'Esta ficha é destinada aos jogadores.');
+  if(typeof data.base64!=='string'||data.base64.length>Math.ceil(MAX_TRAINER_IMAGE_BYTES*4/3)||!/^[a-zA-Z0-9+/]+={0,2}$/.test(data.base64))fail(400,'Use uma imagem PNG, JPG ou WEBP de até 5 MB.');
+  const buf=Buffer.from(data.base64,'base64');
+  if(buf.length<20||buf.length>MAX_TRAINER_IMAGE_BYTES)fail(400,'A imagem deve ter até 5 MB.');
+  const png=buf.subarray(0,8).equals(Buffer.from('89504e470d0a1a0a','hex'));
+  const jpg=buf[0]===255&&buf[1]===216&&buf[2]===255;
+  const webp=buf.toString('ascii',0,4)==='RIFF'&&buf.toString('ascii',8,12)==='WEBP';
+  if(!png&&!jpg&&!webp)fail(400,'Use imagem PNG, JPG ou WEBP válida.');
+  fs.mkdirSync(TRAINER_MEDIA_DIR,{recursive:true});
+  const file=`${user.id}-${id()}.${png?'png':jpg?'jpg':'webp'}`;
+  fs.writeFileSync(path.join(TRAINER_MEDIA_DIR,file),buf,{flag:'wx',mode:0o600});
+  const previous=user.trainer;
+  user.trainer={name:user.name,hometown:'',bio:'',...previous,image:`/api/trainer-media/${file}`};
+  try {save();}catch(error){user.trainer=previous;fs.unlinkSync(path.join(TRAINER_MEDIA_DIR,file));throw error;}
+  if(previous?.image?.startsWith('/api/trainer-media/')){try{fs.unlinkSync(path.join(TRAINER_MEDIA_DIR,path.basename(previous.image)));}catch{}}
+  return user.trainer;
+}
+function serveTrainerMedia(req,res,pathname) {
+  const viewer=auth(req);
+  const match=pathname.match(/^\/api\/trainer-media\/([a-f\d-]{36})-[a-f\d-]{36}\.(png|jpg|webp)$/);
+  const target=match&&db.users.find(u=>u.id===match[1]&&u.trainer?.image===pathname);
+  if(!target || (viewer.id!==target.id&&!db.campaigns.some(c=>c.memberIds.includes(target.id)&&(c.masterId===viewer.id||c.memberIds.includes(viewer.id)))))fail(404,'Imagem não encontrada.');
+  const file=path.join(TRAINER_MEDIA_DIR,path.basename(pathname));
+  if(!fs.existsSync(file))fail(404,'Imagem não encontrada.');
+  const buf=fs.readFileSync(file);
+  res.writeHead(200,{'Content-Type':`image/${match[2]==='jpg'?'jpeg':match[2]}`,'Content-Length':buf.length,'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'});res.end(buf);
+}
 function recordDiscovery(campaignId, ownerId, speciesId, status) {
   const old=db.discoveries.find(d=>d.campaignId===campaignId&&d.ownerId===ownerId&&d.speciesId===speciesId);
   if(old){
@@ -297,6 +327,7 @@ async function api(req,res,url) {
     const gm=db.users.find(u=>u.id===campaign.masterId);
     return response(res,200,{valid:true,campaign:{name:campaign.name,masterName:gm?.name||'Mestre'}});
   }
+  if(req.method==='GET'&&pathname.startsWith('/api/trainer-media/'))return serveTrainerMedia(req,res,pathname);
   if(req.method==='GET'&&pathname.startsWith('/api/species-media/'))return serveMedia(req,res,pathname);
   if(req.method==='GET' && pathname==='/api/me') {
     const user=currentUser(req);return response(res,200,{user:user?safeUser(user):null,campaigns:user?db.campaigns.filter(c=>c.masterId===user.id||c.memberIds.includes(user.id)).map(c=>campaignInfo(c,user)):[],species:user?db.species.map(p=>publicSpeciesFor(user,p)).filter(Boolean):[],discoveries:user?db.discoveries.filter(d=>db.campaigns.some(c=>c.id===d.campaignId&&(c.masterId===user.id||(c.memberIds.includes(user.id)&&d.ownerId===user.id)))):[],captured:user?db.captured.filter(p=>db.campaigns.some(c=>c.id===p.campaignId&&(c.masterId===user.id||(c.memberIds.includes(user.id)&&p.ownerId===user.id)))).map(safeCaptured):[],items:user?db.items.filter(x=>db.campaigns.some(c=>c.id===x.campaignId&&(c.masterId===user.id||c.memberIds.includes(user.id)))):[],inventory:user?db.inventory.filter(x=>db.campaigns.some(c=>c.id===x.campaignId&&(c.masterId===user.id||(c.memberIds.includes(user.id)&&x.ownerId===user.id)))):[],wallets:user?db.wallets.filter(x=>db.campaigns.some(c=>c.id===x.campaignId&&(c.masterId===user.id||(c.memberIds.includes(user.id)&&x.ownerId===user.id)))):[],itemHistory:user?db.itemHistory.filter(x=>db.campaigns.some(c=>c.id===x.campaignId&&(c.masterId===user.id||(c.memberIds.includes(user.id)&&x.ownerId===user.id)))).slice(-150):[]});
@@ -310,7 +341,7 @@ async function api(req,res,url) {
     const token=cookie(req,'evolink_session'); if(token){db.sessions=db.sessions.filter(s=>s.hash!==sessionHash(token));save();}
     res.setHeader('Set-Cookie','evolink_session=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0');return response(res,200,{ok:true});
   }
-  const data=req.method==='POST'?await readJSON(req,pathname.endsWith('/image')?MAX_IMAGE_BODY_BYTES:pathname.endsWith('/import')?2_500_000:32768):{};
+  const data=req.method==='POST'?await readJSON(req,pathname==='/api/trainer/image'?Math.ceil(MAX_TRAINER_IMAGE_BYTES*4/3)+2048:pathname.endsWith('/image')?MAX_IMAGE_BODY_BYTES:pathname.endsWith('/import')?2_500_000:32768):{};
   if(req.method==='POST' && pathname==='/api/register') {
     rateLimit(req);
     const username=clean(data.username,25).toLowerCase();const password=data.password;const name=clean(data.name,40);const role=data.role;
@@ -347,10 +378,11 @@ async function api(req,res,url) {
   if(req.method==='POST'&&memberRoute){const c=owner(req,memberRoute[1]);const memberId=clean(data.memberId,50);c.memberIds=c.memberIds.filter(x=>x!==memberId);save();return response(res,200,{campaign:campaignInfo(c)});}
   const recodeRoute=pathname.match(/^\/api\/campaigns\/([a-f\d-]+)\/reissue-code$/);
   if(req.method==='POST'&&recodeRoute){const c=owner(req,recodeRoute[1]);c.code=newCode();save();return response(res,200,{campaign:campaignInfo(c)});}
+  if(req.method==='POST'&&pathname==='/api/trainer/image'){return response(res,200,{trainer:receiveTrainerImage(auth(req),data)});}
   if(req.method==='POST'&&pathname==='/api/trainer'){
     const u=auth(req);if(u.role!=='jogador')fail(403,'Esta ficha é destinada aos jogadores.');
     const name=clean(data.name,40);if(name.length<2)fail(400,'Nome de treinador muito curto.');
-    u.trainer={name,hometown:clean(data.hometown,60),bio:clean(data.bio,300)};save();return response(res,200,{trainer:u.trainer});
+    u.trainer={...u.trainer,name,hometown:clean(data.hometown,60),bio:clean(data.bio,300)};save();return response(res,200,{trainer:u.trainer});
   }
   // O Mestre registra encontros; jogadores não podem marcar Pokémon por conta própria.
   const encounter=pathname.match(/^\/api\/campaigns\/([a-f\d-]+)\/discoveries$/);
@@ -525,3 +557,4 @@ function createServer() {
 }
 if(require.main===module){createServer().listen(PORT,'0.0.0.0',()=>console.log(`EvoLink pronto em http://localhost:${PORT}`));}
 module.exports={createServer};
+

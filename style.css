@@ -103,3 +103,6 @@
 
 /* v0.6 — alerta de compartilhamento local */
 .demo-online-warning{border-radius:10px;background:#fff0df;border:2px solid #dc9554;color:#7a4426;font-size:12px;padding:11px;margin-top:10px;font-weight:750;line-height:1.5}
+
+
+.trainer-portrait{width:96px;height:96px;object-fit:contain;border-radius:12px;background:#fff;flex-shrink:0}.member .trainer-portrait{width:64px;height:64px}
