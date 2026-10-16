@@ -1,0 +1,75 @@
+/* EvoLink v12 - cards de edicao em estilo Pokedex.
+   CSS separado, compativel com a Content Security Policy do EvoLink. */
+.dex-v12-screen { background: #f8faf8; padding-bottom: 188px !important; }
+.dex-v12-page { display:block; max-width: 690px; margin:0 auto; padding: 5px 0 30px; }
+.dex-v12-header { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:13px 2px 18px; }
+.dex-v12-header-title { flex:1; min-width:0; text-align:left; }
+.dex-v12-kicker { font-size:11px; font-weight:900; letter-spacing:.1em; color:#579588; }
+.dex-v12-header h1 { margin:4px 0 4px; font-size:31px; color:#263c3a; font-weight:850; }
+.dex-v12-header p { margin:0; font-size:13px; line-height:1.35; color:#647b7a; }
+.dex-v12-shiny { width:72px; height:72px; flex:0 0 72px; border:none; border-radius:50%; box-shadow:0 2px 8px #38515025; background:conic-gradient(#ef6ea6,#ffba6d,#e8e972,#70d69a,#6ec7f8,#b8a2ff,#ef6ea6); color:#30333b; font-weight:900; display:flex; align-items:center; justify-content:center; flex-direction:column; cursor:pointer; }
+.dex-v12-shiny span { font-size:25px; line-height:1; }
+.dex-v12-shiny small { font-size:10px; font-weight:900; padding:3px 6px; border-radius:12px; background:#ffffffcb; margin-top:4px; }
+.dex-v12-shiny.selected { outline:3px solid #6c80ca; outline-offset:2px; }
+.dex-v12-filters { background:#fff; border:1px solid #dce9e6; padding:10px; border-radius:15px; display:grid; grid-template-columns:minmax(0,1fr) 140px; gap:9px; margin:8px 0 14px; }
+.dex-v12-filters .field { min-width:0; }
+.dex-v12-filters .field input,.dex-v12-filters .field select { min-height:42px; font-size:13px; padding:8px; border:1px solid #b9d5cc; background:#f7fbf9; }
+.dex-v12-count { font-size:12px; font-weight:750; color:#698179; margin:5px 0 13px; }
+.dex-v12-list { display:flex; flex-direction:column; gap:13px; }
+.dex-v12-card { --dex-bg:#d6dfda; appearance:none; -webkit-appearance:none; display:flex; text-align:left; position:relative; box-sizing:border-box; align-items:center; justify-content:space-between; width:100%; min-height:138px; border:0; border-radius:23px; padding:13px 11px 13px 20px; overflow:hidden; background:var(--dex-bg); box-shadow:0 3px 7px #273c3a21; cursor:pointer; transition:transform .12s ease,box-shadow .12s ease; }
+.dex-v12-card:active { transform:scale(.99); }
+.dex-v12-card:focus-visible { outline:3px solid #294e72; outline-offset:2px; }
+.dex-v12-card-content { display:flex; flex-direction:column; flex:1; min-width:0; position:relative; z-index:1; }
+.dex-v12-card-top { display:flex; align-items:baseline; gap:9px; min-width:0; }
+.dex-v12-number { font-size:13px; color:#43675e; font-weight:750; flex-shrink:0; }
+.dex-v12-name { font-size:clamp(19px,4.2vw,25px); color:#315a54; font-weight:750; line-height:1.15; white-space:nowrap; text-overflow:ellipsis; overflow:hidden; }
+.dex-v12-card-check { color:#49786a; margin-left:auto; padding-left:3px; font-size:18px; font-weight:800; }
+.dex-v12-category { font-size:12px; color:#547268; margin:5px 0 12px; font-weight:550; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+.dex-v12-types { display:flex; flex-wrap:wrap; gap:7px; }
+.dex-v12-type-pill { display:inline-flex; border:1.5px solid #47645755; color:#3d6155; border-radius:999px; min-height:29px; padding:4px 12px; align-items:center; justify-content:center; font-size:11px; font-weight:850; letter-spacing:.025em; max-width:100%; box-sizing:border-box; background:#ffffff28; }
+.dex-v12-edit-caption { font-size:10px; font-weight:750; color:#497368; margin-top:8px; }
+.dex-v12-image-circle { display:grid; place-items:center; flex:0 0 121px; width:121px; height:121px; align-self:center; overflow:hidden; border-radius:50%; background:#f9ffff8a; margin-left:6px; position:relative; }
+.dex-v12-image { display:block; width:100%; height:100%; object-fit:contain; }
+.dex-v12-art-placeholder { font-size:56px; color:#ffffff; }
+.dex-v12-pager { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:22px; background:#fff; border-radius:12px; padding:10px; }
+.dex-v12-pager span { font-weight:850; color:#5b756f; font-size:13px; }
+.dex-v12-create { margin:17px 0; }
+.dex-v12-empty { background:#fff; border:1px solid #dbe8e5; border-radius:15px; padding:28px 15px; text-align:center; color:#5e7d74; }
+.dex-v12-empty strong { display:block; font-size:17px; color:#37584e; }
+.dex-v12-empty p { font-size:13px; margin:7px 0 0; }
+.dex-v12-back { margin:3px 0 12px; }
+/* Cores suaves de acordo com o tipo principal, inspiradas na referencia. */
+.dex-v12-card[data-type="Normal"] { --dex-bg:#dfd7c7; }
+.dex-v12-card[data-type="Fogo"] { --dex-bg:#f5b99b; }
+.dex-v12-card[data-type="Água"] { --dex-bg:#a6d3e9; }
+.dex-v12-card[data-type="Grama"] { --dex-bg:#99d2bc; }
+.dex-v12-card[data-type="Elétrico"] { --dex-bg:#f2d988; }
+.dex-v12-card[data-type="Gelo"] { --dex-bg:#ade7e6; }
+.dex-v12-card[data-type="Lutador"] { --dex-bg:#dfb3a2; }
+.dex-v12-card[data-type="Veneno"] { --dex-bg:#d0b7dc; }
+.dex-v12-card[data-type="Terra"] { --dex-bg:#d7c28e; }
+.dex-v12-card[data-type="Voador"] { --dex-bg:#bacdec; }
+.dex-v12-card[data-type="Psíquico"] { --dex-bg:#eeb4c4; }
+.dex-v12-card[data-type="Inseto"] { --dex-bg:#cada9c; }
+.dex-v12-card[data-type="Pedra"] { --dex-bg:#cfc5a7; }
+.dex-v12-card[data-type="Fantasma"] { --dex-bg:#bdafd3; }
+.dex-v12-card[data-type="Dragão"] { --dex-bg:#adafef; }
+.dex-v12-card[data-type="Sombrio"] { --dex-bg:#afa4aa; }
+.dex-v12-card[data-type="Aço"] { --dex-bg:#c1d1da; }
+.dex-v12-card[data-type="Fada"] { --dex-bg:#eac0d7; }
+@media (max-width:410px) {
+  .dex-v12-card { min-height:118px; padding:11px 7px 11px 12px; border-radius:21px; }
+  .dex-v12-image-circle { width:96px; height:96px; flex-basis:96px; margin-left:5px; }
+  .dex-v12-name { font-size:20px; }
+  .dex-v12-number { font-size:11px; }
+  .dex-v12-type-pill { font-size:10px; padding:4px 8px; }
+  .dex-v12-header h1 { font-size:28px; }
+  .dex-v12-shiny { flex-basis:61px; width:61px; height:61px; }
+  .dex-v12-filters { grid-template-columns:minmax(0,1fr) 116px; gap:7px; }
+}
+@media (max-width:350px) {
+  .dex-v12-image-circle { width:82px; height:82px; flex-basis:82px; }
+  .dex-v12-name { font-size:17px; }
+  .dex-v12-card-top { gap:5px; }
+  .dex-v12-type-pill { font-size:9px; padding:3px 6px; }
+}
