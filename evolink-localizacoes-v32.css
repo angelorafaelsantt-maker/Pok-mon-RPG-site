@@ -1,0 +1,10 @@
+/* EvoLink v32 — escolhas de habitats simples no editor de Pokémon */
+.evo32-picker{margin:8px 0 18px;padding:13px;border:1px solid #9ed6d9;border-radius:12px;background:linear-gradient(145deg,#f5fffc,#e9f8ff)}
+.evo32-help{font-size:12px;font-weight:850;color:#31526a;margin:0 0 12px}
+.evo32-options{display:flex;flex-wrap:wrap;gap:8px}
+.evo32-option{position:relative;cursor:pointer;font-size:12px;font-weight:850}
+.evo32-option input{position:absolute;inset:0;opacity:0;width:100%;height:100%;cursor:pointer}
+.evo32-option span{display:inline-flex;align-items:center;min-height:33px;padding:7px 11px;border:1px solid #9eafbd;border-radius:20px;background:#fff;color:#37516c;transition:background .12s,color .12s}
+.evo32-option input:checked+span{background:#2a7495;border-color:#2a7495;color:#fff;box-shadow:0 2px 0 #19536a}
+.evo32-option input:focus-visible+span{outline:2px solid #fdb75e;outline-offset:2px}
+.evo32-original-field{position:absolute!important;width:1px!important;height:1px!important;opacity:0!important;pointer-events:none!important;padding:0!important;border:0!important}

@@ -1,4 +1,4 @@
-# EvoLink — v15: ficha futurista do treinador e painel de leitura para Mestre.
+# EvoLink — v32: localizações simples de habitats, mantendo fichas anteriores.
 # Mantém instalação v7 (ataques), v12 (editor), v13 (correção visual), v14 (Pokédex jogadores).
 FROM node:22-alpine
 WORKDIR /app
@@ -17,6 +17,7 @@ RUN set -eu; \
     node /tmp/evolink-repo/evolink-pokedex-detail-installer-v13.js; \
     node /tmp/evolink-repo/evolink-pokedex-jogadores-installer-v14.js; \
     node /tmp/evolink-repo/evolink-ficha-installer-v15.js; \
+    node /tmp/evolink-repo/evolink-localizacoes-installer-v32.js; \
     test -s /app/public/index.html || { echo 'ERRO: HTML ausente.' >&2; exit 1; }; \
     test -s /app/server.js || { echo 'ERRO: servidor ausente.' >&2; exit 1; }; \
     mkdir -p /app/data; \
