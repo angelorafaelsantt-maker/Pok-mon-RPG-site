@@ -20,6 +20,7 @@ RUN set -eu; \
     test -s /app/public/index.html || { echo 'ERRO: HTML ausente.' >&2; exit 1; }; \
     test -s /app/server.js || { echo 'ERRO: servidor ausente.' >&2; exit 1; }; \
     mkdir -p /app/data; \
+    touch /app/evolink-cloud-adapter.js; \
     chown -R node:node /app; \
     rm -rf /tmp/evolink-repo /tmp/evolink-extracted
 ENV NODE_ENV=production DATA_DIR=/app/data TRUST_PROXY=1 PORT=3000
