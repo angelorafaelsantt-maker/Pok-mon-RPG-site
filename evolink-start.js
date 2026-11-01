@@ -1,31 +1,20 @@
 'use strict';
-// EvoLink startup, without Railway's oversized inline Node argument.
-// Keep the existing Railway environment variables and persistent volume.
+// Inicializador de diagnostico. Nao substitui o payload legado completo.
 const fs = require('node:fs');
-const path = require('node:path');
-const dataDir = process.env.DATA_DIR || '/app/data';
-fs.mkdirSync(dataDir, { recursive: true });
-
-// These existing patches are applied in the same order as the old command.
-function runEnvPatch(name) {
-  const source = process.env[name];
-  if (source) (0, eval)(source);
+const dir = process.env.DATA_DIR || '/app/data';
+fs.mkdirSync(dir, {recursive:true});
+const adapter='/app/evolink-cloud-adapter.js';
+if (!fs.existsSync(adapter) || fs.statSync(adapter).size===0) {
+  console.error('[EVOLINK] Adaptador da nuvem ausente. Nao publicar este inicializador antes de migrar o payload legado.');
+  process.exit(1);
 }
-runEnvPatch('EV98_SEED');
-
-// IMPORTANT: The former Railway start command also contained a large inline
-// cloud-adapter payload. This file cannot reconstruct that payload from the
-// repository alone. Do not replace the old start command until that payload
-// is extracted into /app/evolink-cloud-adapter.js during the Docker build.
-if (!fs.existsSync('/app/evolink-cloud-adapter.js') ||
-    fs.statSync('/app/evolink-cloud-adapter.js').size === 0) {
-  throw new Error('EvoLink: cloud adapter ausente ou vazio; preserve o payload original antes de trocar o startCommand.');
+function patch(name) {
+  const code=process.env[name];
+  if (code) (0,eval)(code);
 }
-
-runEnvPatch('EV74_PATCH');
-runEnvPatch('EV100_CLOUD_MIGRATE');
-runEnvPatch('EV99_POST_PATCH');
-
-const server = require('/app/server.js').createServer();
-const port = Number(process.env.PORT || 3000);
-server.listen(port, '0.0.0.0', () => console.log(`EvoLink online na porta ${port}`));
+patch('EV98_SEED');
+patch('EV74_PATCH');
+patch('EV100_CLOUD_MIGRATE');
+patch('EV99_POST_PATCH');
+const port=Number(process.env.PORT || 3000);
+require('/app/server.js').createServer().listen(port,'0.0.0.0',()=>console.log('[EVOLINK] Online: '+port));
