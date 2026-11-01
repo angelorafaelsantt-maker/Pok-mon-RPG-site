@@ -1,16 +1,16 @@
-# EvoLink: build verificavel, preservando o volume /app/data
 FROM node:22-alpine
 WORKDIR /app
 COPY . /tmp/evolink-repo/
 RUN set -eu; \
-    echo '[EVOLINK] Extraindo pacote'; \
     archive=/tmp/evolink-repo/EvoLink-Pokemon-Evolution-RPG-v0.6-Online.zip; \
     test -s "$archive"; \
+    test -s /tmp/evolink-repo/evolink-legacy-start.js; \
     mkdir -p /tmp/evolink-extracted; \
     busybox unzip -q "$archive" -d /tmp/evolink-extracted; \
     cp -R /tmp/evolink-extracted/evolink-pokemon-rpg/. /app/; \
     cp /tmp/evolink-repo/server.js /app/server.js; \
     cp /tmp/evolink-repo/evolink-start.js /app/evolink-start.js; \
+    cp /tmp/evolink-repo/evolink-legacy-start.js /app/evolink-legacy-start.js; \
     cp /tmp/evolink-repo/app.js /tmp/evolink-repo/style.css /tmp/evolink-repo/sw.js /app/public/; \
     for installer in evolink-attacks-installer.js evolink-pokedex-editor-installer-v12.js evolink-pokedex-detail-installer-v13.js evolink-pokedex-jogadores-installer-v14.js evolink-ficha-installer-v15.js evolink-localizacoes-installer-v32.js evolink-mega-gigantamax-installer-v33.js; do \
       echo "[EVOLINK] INICIO $installer"; \
@@ -19,9 +19,6 @@ RUN set -eu; \
     done; \
     test -s /app/public/index.html; \
     test -s /app/server.js; \
-    test -s /app/evolink-start.js; \
-    mkdir -p /app/data; \
-    if [ -s /tmp/evolink-repo/evolink-cloud-adapter.js ]; then cp /tmp/evolink-repo/evolink-cloud-adapter.js /app/evolink-cloud-adapter.js; fi; \
     chown -R node:node /app; \
     rm -rf /tmp/evolink-repo /tmp/evolink-extracted; \
     echo '[EVOLINK] BUILD OK'
