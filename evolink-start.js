@@ -1,4 +1,3 @@
 'use strict';
-// Executa o codigo legado completo, extraido do comando original do Railway.
-// Nao executar codigo de fontes desconhecidas.
+// Original legacy startup is extracted from the old Railway start command.
 require('/app/evolink-legacy-start.js');
