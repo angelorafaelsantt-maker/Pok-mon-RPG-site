@@ -74,8 +74,8 @@ const frontend=`
    return;
  }
 `;
-modify('app.js'," if(action==='team-toggle')",frontend,'EVOLINK_LEVEL_BUTTON_V1');
-const appPath=path.join(root,'app.js');
+modify('public/app.js'," if(action==='team-toggle')",frontend,'EVOLINK_LEVEL_BUTTON_V1');
+const appPath=path.join(root,'public/app.js');
 let app=fs.readFileSync(appPath,'utf8');
 if(!app.includes('EVOLINK_LEVEL_BUTTON_UI_V1')){
  const needle='${master?`<button class="btn secondary tiny" type="button" data-action="edit-capture"';
