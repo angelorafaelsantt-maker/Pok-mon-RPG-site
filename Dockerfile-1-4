@@ -18,6 +18,7 @@ RUN set -eu; \
     node /tmp/evolink-repo/evolink-pokedex-jogadores-installer-v14.js; \
     node /tmp/evolink-repo/evolink-ficha-installer-v15.js; \
     node /tmp/evolink-repo/evolink-localizacoes-installer-v32.js; \
+    node /tmp/evolink-repo/evolink-mega-visibility-v34.js; \
     node /tmp/evolink-repo/evolink-mega-gigantamax-installer-v33.js; \
     test -s /app/public/index.html; \
     test -s /app/server.js; \
